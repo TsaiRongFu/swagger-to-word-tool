@@ -62,60 +62,60 @@
                 <td colspan="5" th:text="${table.tag}"></td>
             </tr>
             <tr>
-                <td>接口描述</td>
+                <td>API 描述</td>
                 <td colspan="4" th:text="${table.description}"></td>
             </tr>
             <tr>
                 <td>URL</td>
-                <td  style="font-family: Times New Roman" colspan="4" th:text="${table.url}"></td>
+                <td style="font-family: Times New Roman" colspan="4" th:text="${table.url}"></td>
             </tr>
             <tr>
-                <td>请求方式</td>
+                <td>請求方式</td>
                 <td style="font-family: Times New Roman" colspan="4" th:text="${table.requestType}"></td>
             </tr>
             <tr>
-                <td>请求类型</td>
+                <td>請求類型</td>
                 <td colspan="4" th:text="${table.requestForm}"></td>
             </tr>
             <tr>
-                <td>返回类型</td>
+                <td>返回類型</td>
                 <td colspan="4" th:text="${table.responseForm}"></td>
             </tr>
-
+        
             <tr class="bg table_title" align="center">
-                <td style="font-family: 楷体">参数名</td>
-                <td style="font-family: 楷体">数据类型</td>
-<!--                <td>参数类型</td>-->
-                <td style="font-family: 楷体">是否必填</td>
-                <td style="font-family: 楷体" colspan="2">说明</td>
+                <td style="font-family: 楷體">參數名稱</td>
+                <td style="font-family: 楷體">數據類型</td>
+        <!--                <td>參數類型</td>-->
+                <td style="font-family: 楷體">是否必填</td>
+                <td style="font-family: 楷體" colspan="2">說明</td>
             </tr>
-
+        
             <tr align="center" th:each="request:${table.requestList}">
                 <td style="font-family: Times New Roman" th:text="${request.name}"></td>
                 <td style="font-family: Times New Roman" th:text="${request.type}"></td>
-<!--                <td th:text="${request.paramType}"></td>-->
+        <!--                <td th:text="${request.paramType}"></td>-->
                 <td th:if="${request.require}" style="color: red;font-family: Times New Roman" th:text="Y"></td>
                 <td style="font-family: Times New Roman" th:if="${!request.require}" th:text="N"></td>
                 <td colspan="2" th:text="${request.remark}"></td>
             </tr>
-
+        
             <tr class="bg" align="center">
-                <td style="font-family: 楷体">状态码</td>
-                <td style="font-family: 楷体">描述</td>
-                <td style="font-family: 楷体" colspan="3">说明</td>
+                <td style="font-family: 楷體">狀態碼</td>
+                <td style="font-family: 楷體">描述</td>
+                <td style="font-family: 楷體" colspan="3">說明</td>
             </tr>
-
+        
             <tr align="center" th:each="response:${table.responseList}">
                 <td th:text="${response.name}"></td>
                 <td th:text="${response.description}"></td>
                 <td colspan="3" th:text="${response.remark}"></td>
             </tr>
-
+        
             <tr class="bg">
-                <td colspan="5">示例</td>
+                <td colspan="5">範例</td>
             </tr>
             <tr class="specialHeight">
-                <td class="bg">请求参数</td>
+                <td class="bg">請求參數</td>
                 <td style="font-family: Times New Roman" colspan="4" th:utext="${table.requestParam}"></td>
             </tr>
             <tr class="specialHeight">
@@ -123,6 +123,7 @@
                 <td style="font-family: Times New Roman" colspan="4" th:utext="${table.responseParam}"></td>
             </tr>
         </table>
+        
     </div>
 </div>
 </body>

@@ -72,16 +72,35 @@ public class WordServiceImpl implements WordService {
                     if (description== "null") {
                         description = tag;
                     }
-                    // 7.请求参数格式，类似于 multipart/form-data
+                    // 7. 解析請求格式 (OpenAPI 3.0)
                     String requestForm = "";
-                    List<String> consumes = (List) content.get("consumes");
-                    if (consumes != null && consumes.size() > 0) {
+                    List<String> consumes = new ArrayList<>();
+                    // 处理 "requestBody"
+                    Map<String, LinkedHashMap> requestBodyMap = (LinkedHashMap) content.get("requestBody");
+                    if (requestBodyMap != null) {
+                        Map<String, Object> requestContent = (Map<String, Object>) requestBodyMap.get("content");
+                        if (requestContent != null && !requestContent.isEmpty()) {
+                            consumes.addAll(requestContent.keySet());
+                        }
+                    }
+                    if (!consumes.isEmpty()) {
                         requestForm = StringUtils.join(consumes, ",");
                     }
-                    // 8.返回参数格式，类似于 application/json
+
+                    // 8. 解析回應格式 (OpenAPI 3.0)
                     String responseForm = "";
-                    List<String> produces = (List) content.get("produces");
-                    if (produces != null && produces.size() > 0) {
+                    List<String> produces = new ArrayList<>();
+                    Map<String, Object> responsesMap = (Map<String, Object>) content.get("responses");
+                    if (responsesMap != null) {
+                        for (Map.Entry<String, Object> entry : responsesMap.entrySet()) {
+                            Map<String, Object> responseDetail = (Map<String, Object>) entry.getValue();
+                            Map<String, Object> responseContent = (Map<String, Object>) responseDetail.get("content");
+                            if (responseContent != null && !responseContent.isEmpty()) {
+                                produces.addAll(responseContent.keySet());
+                            }
+                        }
+                    }
+                    if (!produces.isEmpty()) {
                         responseForm = StringUtils.join(produces, ",");
                     }
                     // 9. 请求体
@@ -248,34 +267,46 @@ public class WordServiceImpl implements WordService {
                         }
                     }
 
-                    // 10.返回体
+                    // 10. 返回体
                     List<Response> responseList = new ArrayList<>();
-                    Map<String, Object> responses = (LinkedHashMap) content.get("responses");
-                    Iterator<Map.Entry<String, Object>> it3 = null;
-                    if(responses != null) {
-                        it3 = responses.entrySet().iterator();
-                    }
-                    while (it3 != null && it3.hasNext()) {
-                        Response response = new Response();
-                        Map.Entry<String, Object> entry = it3.next();
-                        // 状态码 200 201 401 403 404 这样
-                        response.setName(entry.getKey());
-                        LinkedHashMap<String, Object> statusCodeInfo = (LinkedHashMap) entry.getValue();
-                        response.setDescription(String.valueOf(statusCodeInfo.get("description")));
-                        response.setRemark(String.valueOf(statusCodeInfo.get("description")));
-                        responseList.add(response);
+                    Map<String, Object> responses = (Map<String, Object>) content.get("responses");
+                    if (responses != null) {
+                        for (Map.Entry<String, Object> entry : responses.entrySet()) {
+                            Response response = new Response();
+                            // 将 key 作为状态码（如 "200", "201", "401" 等）
+                            response.setName(entry.getKey());
+                            
+                            // 获取响应信息对象
+                            Map<String, Object> statusCodeInfo = (Map<String, Object>) entry.getValue();
+                            // 使用一个局部变量避免与外部的 description 冲突
+                            String respDesc = statusCodeInfo.get("description") != null 
+                                            ? statusCodeInfo.get("description").toString() : "";
+                            response.setDescription(respDesc);
+                            response.setRemark(respDesc);
+                            
+                            // 如果需要处理 OpenAPI 3.0 中的 mediaType，可在此处解析，但需先在 Response 类中定义相关属性
+                            // if (statusCodeInfo.containsKey("content")) {
+                            //     Map<String, Object> contentMap = (Map<String, Object>) statusCodeInfo.get("content");
+                            //     if (!contentMap.isEmpty()) {
+                            //         String mediaType = contentMap.keySet().iterator().next();
+                            //         // 如果 Response 类中定义了 mediaType 属性，则可调用：
+                            //         // response.setMediaType(mediaType);
+                            //     }
+                            // }
+                            
+                            responseList.add(response);
+                        }
                     }
 
-                    // 保存出现的tag
+                    // 保存出现的 tag
                     titleSet.add(title);
-                    //封装Table
+
+                    // 封装 Table
                     Table table = new Table();
-                    //是否添加为菜单
-//                    if (MenuUtils.isMenu(title)) {
-                        table.setTitle(title);
-//                    }
+                    table.setTitle(title);
                     table.setUrl(url);
                     table.setTag(tag);
+                    // 注意：此处的 description 为方法内的一个变量，请确保它与上面的 respDesc 不冲突
                     table.setDescription(description);
                     table.setRequestForm(requestForm);
                     table.setResponseForm(responseForm);
@@ -286,80 +317,67 @@ public class WordServiceImpl implements WordService {
                         request.setParamType(request.getParamType().replaceAll("#/definitions/", ""));
                     }
                     table.setRequestList(requestList);
-                    // 取出来状态是200时的返回值
-                    Object obj = null;
-                    if( responses != null) {
-                        obj =  responses.get("200");
-                    }
+
+                    // 取出状态码为 200 的返回值
+                    Object obj = (responses != null) ? responses.get("200") : null;
                     if (obj == null) {
                         table.setResponseParam("");
                         result.add(table);
-                        continue;
+                    } else {
+                        Map<String, Object> response200 = (Map<String, Object>) obj;
+                        // 尝试获取 schema 节点（OpenAPI 3.0 通常位于 content 下，也可能直接使用 $ref）
+                        Object schemaObj = response200.get("schema");
+                        if (schemaObj == null) {
+                            schemaObj = response200;
+                        }
+                        
+                        if (schemaObj == null) {
+                            table.setResponseParam("");
+                            result.add(table);
+                        } else {
+                            Map<String, Object> schemaMap = (Map<String, Object>) schemaObj;
+                            if (schemaMap.get("$ref") != null) {
+                                // 非数组类型返回值，直接通过 $ref 解析
+                                String ref = (String) schemaMap.get("$ref");
+                                ObjectNode objectNode = parseRef(ref, map);
+                                table.setResponseParam(this.format(objectNode.toString()));
+                                result.add(table);
+                            } else if (schemaMap.get("content") != null) {
+                                // 处理返回体中带 content 的结构（OpenAPI 3.0）
+                                Map<String, Object> contentMap = (Map<String, Object>) schemaMap.get("content");
+                                if (!contentMap.isEmpty()) {
+                                    // 这里假设取第一个媒体类型，如 "application/json" 或 "*/*"
+                                    Map.Entry<String, Object> mediaEntry = contentMap.entrySet().iterator().next();
+                                    Map<String, Object> mediaTypeObj = (Map<String, Object>) mediaEntry.getValue();
+                                    Map<String, Object> tempSchema = (Map<String, Object>) mediaTypeObj.get("schema");
+                                    String ref = (String) tempSchema.get("$ref");
+                                    ObjectNode objectNode = parseRef(ref, map);
+                                    table.setResponseParam(this.format(objectNode.toString()));
+                                    result.add(table);
+                                } else {
+                                    table.setResponseParam("");
+                                    result.add(table);
+                                }
+                            } else if (schemaMap.get("items") != null) {
+                                // 数组类型返回值
+                                Map<String, Object> itemsMap = (Map<String, Object>) schemaMap.get("items");
+                                if (itemsMap.get("$ref") != null) {
+                                    String ref = (String) itemsMap.get("$ref");
+                                    ObjectNode objectNode = parseRef(ref, map);
+                                    ArrayNode arrayNode = JsonUtils.createArrayNode();
+                                    arrayNode.add(objectNode);
+                                    table.setResponseParam(this.format(arrayNode.toString()));
+                                    result.add(table);
+                                } else {
+                                    table.setResponseParam("");
+                                    result.add(table);
+                                }
+                            } else {
+                                table.setResponseParam("");
+                                result.add(table);
+                            }
+                        }
                     }
-                    // 两个结构
-//                    "responses": {
-//                        "200": {
-//                            "description": "OK",
-//                                    "content": {
-//                                "*/*": {
-//                                    "schema": {
-//                                        "$ref": "#/components/schemas/RString"
-//                                    }
-//                                }
-//                            }
-//                        }
-//                    }
-//                    "responses":{
-//                        "200": {
-//                              "$ref":"#/components/schemas/RString"
-//                          }
-//                    }
-                    Object schema = ((Map) obj).get("schema");
-                    if(schema == null) {
-                        schema = obj;
-                    }
-
-                    if (schema == null  ) {
-                        table.setResponseParam("");
-                        result.add(table);
-                        continue;
-                    }
-
-                    if (((Map) schema).get("$ref") != null) {
-                        //非数组类型返回值
-                        String ref = (String) ((Map) schema).get("$ref");
-                        //解析swagger2 ref链接
-                        ObjectNode objectNode = parseRef(ref, map);
-                        table.setResponseParam(this.format(objectNode.toString()));
-                        result.add(table);
-                        continue;
-                    }
-                    if(((Map) schema).get("content") != null){
-                        Object respContent =((Map) schema).get("content");
-                        Object xing = ((Map) respContent).get("*/*");
-                        Object tempSchema = ((Map) xing).get("schema");
-                        String ref = (String) ((Map) tempSchema).get("$ref");
-                        //解析swagger2 ref链接
-                        ObjectNode objectNode = parseRef(ref, map);
-                        table.setResponseParam(this.format(objectNode.toString()));
-                        result.add(table);
-                        continue;
-                    }
-
-                    Object items = ((Map) schema).get("items");
-                    if (items != null && ((Map) items).get("$ref") != null) {
-                        //数组类型返回值
-                        String ref = (String) ((Map) items).get("$ref");
-                        //解析swagger2 ref链接
-                        ObjectNode objectNode = parseRef(ref, map);
-                        ArrayNode arrayNode = JsonUtils.createArrayNode();
-                        arrayNode.add(objectNode);
-                        table.setResponseParam(this.format(arrayNode.toString()));
-                        result.add(table);
-                        continue;
-                    }
-                    result.add(table);
-
                 }
             }
         } catch (Exception e) {
