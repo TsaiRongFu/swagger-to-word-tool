@@ -20,7 +20,7 @@
 ### Installation 安裝
 
 1. git clone 
-2. 運行
+2. mvn spring-boot:run
 3. 打開瀏覽器 瀏覽 127.0.0.1:8088
 
 ### 感謝
